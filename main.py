@@ -19,17 +19,23 @@ def main():
         await ctx.send("Got")
 
     @bot.command(name='reload_scripts', help="Reloads the available scripts from file")
-    async def reload_scripts(ctx):
-        bot.get_scripts()
-        await ctx.send("Reloaded Scripts")
+    async def reload_scripts(ctx, new_folder: str = None):
+        did_load, folder = bot.load_scripts(new_folder)
+        if did_load:
+            await ctx.send(f"Reloaded Scripts from {folder}")
+        else:
+            await ctx.send(f"Failed to load scripts from {folder}")
 
-    @bot.command(name="scripts", help="Prints available scripts")
-    async def get_scripts(ctx):
-        await ctx.send(bot.print_scripts())
+    @bot.command(name="all_scripts", help="Prints available scripts")
+    async def print_scripts(ctx):
+        await ctx.send(bot.format_all_scripts_string())
+
+    @bot.command(name="running_scripts", help="Prints currently running scripts")
+    async def print_running_scripts(ctx):
+        await ctx.send(bot.format_running_scripts_string())
 
     @bot.command(name="run", help="Runs the given script")
     async def run_script(ctx, script_name, *args):
-        print('running')
         response = bot.run_script(script_name, list(args))
         print(response)
         await ctx.send(response)
@@ -47,7 +53,7 @@ def init_bot():
     intents = discord.Intents.default()
     intents.message_content = True
 
-    bot = ScriptBot(command_prefix="!", intents=intents)
+    bot = ScriptBot("Scripts", command_prefix="!", intents=intents)
     return bot
 
 
@@ -62,7 +68,7 @@ def get_api_params():
 
 class ScriptBot(commands.Bot):
 
-    def __init__(self, script_folder: str = "Scripts", **kwargs):
+    def __init__(self, script_folder: str, **kwargs):
         """ Initialises Discord Bot with Scripts from folder.
         Internal variables storing the available scripts and running scripts are created. Scripts are loaded from the
         file folder.
@@ -72,52 +78,74 @@ class ScriptBot(commands.Bot):
         # Variables
         super().__init__(**kwargs)
         self.script_folder = script_folder
-        self.scripts = [ScriptObject]
-        self.running_scripts = {}
+        self.scripts: list[ScriptObject] = list()
+        self.running_scripts: list[str] = list()
         # Init dynamic vars
-        self.get_scripts()
+        self.load_scripts()
         # Run the start up bot command
         # TODO Start up diagnostics
 
-    def get_scripts(self):
-        """ Loads Python Scripts from internal folder.
+    def load_scripts(self, folder: str = None) -> bool:
+        """ Loads Python Scripts from folder.
         Checks folder exists and initialises a ScriptObject for each python file to add to the internal list.
+        :param folder: Folder to load Scripts from.
+        :return bool: Reloaded Scripts.
         """
         scripts = []
-        if os.path.exists(self.script_folder):
+        if folder is not None:
+            if os.path.isdir(folder):
+                self.script_folder = folder
+            else:
+                return False, folder
+        if os.path.isdir(self.script_folder):
             for file in os.listdir(self.script_folder):
                 if file.endswith('.py'):
-                    scripts.append(ScriptBot())
-            self.scripts = scripts
+                    scripts.append(ScriptObject(self.script_folder + "\\" + file))
+        self.scripts = scripts
+        return True, self.script_folder
 
-    def print_scripts(self):
-        """ Returns formatted scripts.
+    def format_running_scripts_string(self):
+        """ Returns formatted running scripts.
         :return scripts: Formatted string
         """
-        script_str = f"{len(self.scripts)} Scripts Available:"
+        formatted_string = f"{len(self.running_scripts)} Scripts Running:"
+        for script in self.running_scripts:
+            formatted_string += f"\n\t{script}"
+        return formatted_string
+
+    def format_all_scripts_string(self):
+        """ Returns formatted available scripts.
+        :return scripts: Formatted string
+        """
+        formatted_string = f"{len(self.scripts)} Scripts Available:"
         for script in self.scripts:
-            script_str += f"\n\t{script}"
-        return script_str
+            formatted_string += f"\n\t{script.name}"
+        return formatted_string
 
     def run_script(self, script_name, args):
-        """ Runs a script. """
+        """ Runs a script.
+        Checks that script not running, then finds the matching script from the arguments and name.
+        :param script_name: Script file name to run.
+        :param args: Arguments to run script with.
+        """
         # Check valid name and not running
+        if script_name in self.running_scripts:
+            return f"Already running {script_name}"
         for script in self.scripts:
             try:
-                script_matches = script.check_match(script_name, args)
+                if script.check_match(script_name, args):
+                    script.run_script(args)
+                    self.running_scripts.append(script.name)
+                    return f"Running Script: {script_name}"
             except ScriptObject.ParserError as parse_error:
-                # TODO send error
+                return str(parse_error)
                 pass
-
-            if script_matches:
-                script.run_script(args)
-                return f"Running Script: {script_name}"
         return f"No matching Script Name {script_name}"
 
     def kill_all_scripts(self):
         """ Forcefully close all scripts. """
-        for spawn in self.running_scripts.values():
-            spawn.close(force=True)
+        self.running_scripts = []
+        pass
 
 
 class ScriptObject:
@@ -133,7 +161,7 @@ class ScriptObject:
         detected.
         :param file_path: File path of the Script to parse.
         """
-        if os.path.exists():
+        if os.path.exists(file_path):
             self.name = os.path.basename(file_path)
             self.path = file_path
             self.parser = argparse.ArgumentParser()
@@ -158,9 +186,9 @@ class ScriptObject:
             try:
                 self.parser.parse_args(args)
             except SystemExit as sys_exit:
-                raise self.ParserError() from sys_exit
+                raise self.ParserError(self.parser.format_help())
             return True
-        raise False
+        return False
 
     def run_script(self, args: [str]):
         """ Runs Script.
@@ -171,8 +199,9 @@ class ScriptObject:
 
     class ParserError(Exception):
 
-        def __init__(self):
-            super().__init__()
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+
 
 if __name__ == "__main__":
     main()
