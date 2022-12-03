@@ -53,3 +53,8 @@ class ScriptObject:
         """
         terminal = Popen(['python', self.path, *args], stdout=PIPE, stdin=PIPE, stderr=PIPE)
         return terminal
+
+    class ParserError(Exception):
+        """ Exception created by error in attempted parsing of arguments. """
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
