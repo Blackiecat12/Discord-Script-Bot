@@ -1,7 +1,8 @@
 import os
 import re
 import argparse
-from subprocess import Popen
+from subprocess import Popen, PIPE
+
 
 class ScriptObject:
     """
@@ -50,5 +51,5 @@ class ScriptObject:
         Creates the command line call for the script and executes it.
         :param args: Script arguments
         """
-        terminal = Popen(['python', self.path, *args], )
+        terminal = Popen(['python', self.path, *args], stdout=PIPE, stdin=PIPE, stderr=PIPE)
         return terminal
