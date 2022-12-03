@@ -16,7 +16,7 @@ class ScriptBot(commands.Bot):
         super().__init__(**kwargs)
         self.script_folder = script_folder
         self.scripts: list[ScriptObject] = list()
-        self.running_scripts: list[str] = list()
+        self.running_scripts: dict = dict()
         # Init dynamic vars
         self.load_scripts()
         # Run the start up bot command
@@ -46,7 +46,7 @@ class ScriptBot(commands.Bot):
         :return scripts: Formatted string
         """
         formatted_string = f"{len(self.running_scripts)} Scripts Running:"
-        for script in self.running_scripts:
+        for script in self.running_scripts.keys():
             formatted_string += f"\n\t{script}"
         return formatted_string
 
@@ -66,7 +66,7 @@ class ScriptBot(commands.Bot):
         :param args: Arguments to run script with.
         """
         # Check valid name and not running
-        if script_name in self.running_scripts:
+        if script_name in self.running_scripts.keys():
             return f"Already running {script_name}"
         for script in self.scripts:
             try:
