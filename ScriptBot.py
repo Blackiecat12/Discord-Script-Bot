@@ -1,4 +1,6 @@
 import os
+import time
+
 from ScriptObject import ScriptObject
 from discord.ext import commands
 
@@ -79,8 +81,18 @@ class ScriptBot(commands.Bot):
         return f"No matching Script Name {script_name}"
 
     def kill_all_scripts(self):
-        """ Forcefully close all scripts. """
-        self.running_scripts = []
-        pass
+        """ Forcefully close all scripts.
+        Sends kill to all terminals, then checks for surviving. Removes terminals that died from self.running_scripts
+        """
+        killed_scripts = []
+        # Kill scripts
+        for script_name, terminal in self.running_scripts.items():
+            terminal.kill()
+            time.sleep(0.1)
+            if terminal.poll() is not None:
+                killed_scripts.append(script_name)
+        # Remove the killed scripts
+        for script in killed_scripts:
+            self.running_scripts.pop(script)
 
 
