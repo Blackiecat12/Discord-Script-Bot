@@ -23,8 +23,6 @@ class ScriptBot(commands.Bot):
         self.running_scripts: dict = dict()
         # Init dynamic vars
         self.load_scripts()
-        # Run the start up bot command
-        # TODO Start up diagnostics
 
     def load_scripts(self, folder: str = None) -> bool:
         """ Loads Python Scripts from folder.
@@ -109,7 +107,7 @@ class ScriptBot(commands.Bot):
         for script_name, terminal in self.running_scripts.items():
             terminal.kill()
             time.sleep(0.1)
-            if terminal.poll() is not None:
+            if not self._check_script_running(script_name):
                 killed_scripts.append(script_name)
         # Remove the killed scripts
         for script in killed_scripts:
