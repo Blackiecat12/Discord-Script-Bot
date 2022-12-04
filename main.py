@@ -37,6 +37,11 @@ def main():
         print(response)
         await ctx.send(response)
 
+    @bot.command(name="query", help="Prints command line output of the given script")
+    async def run_script(ctx, script_name: str):
+        response = bot.get_script_output(script_name)
+        await ctx.send(response)
+
     @bot.command(name='kill', help="Kills all scripts")
     async def kill_all_scripts(ctx):
         bot.kill_all_scripts()
