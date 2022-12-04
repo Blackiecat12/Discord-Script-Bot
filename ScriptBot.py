@@ -3,6 +3,8 @@ import time
 
 from ScriptObject import ScriptObject
 from discord.ext import commands
+from threading import Thread
+from queue import Queue, Empty
 
 
 class ScriptBot(commands.Bot):
@@ -80,6 +82,24 @@ class ScriptBot(commands.Bot):
                 pass
         return f"No matching Script Name {script_name}"
 
+    def get_script_output(self, script_name):
+        """ Returns the string version of the given scripts terminal output.
+        :param script_name: The name of the script to investigate.
+        :return output: Terminal output of the script.
+        """
+        if self._check_script_running(script_name):
+            q = Queue()
+            t = Thread(target=enqueue_output, args=(self.running_scripts[script_name].stdout, q))
+            t.daemon = True  # thread dies with the program
+            t.start()
+            try:
+                line = q.get_nowait().decode("utf-8")
+            except Empty:
+                line = "None"
+            t.join()
+            return f"Output of {script_name}:\n" + line
+        return f"Script {script_name} not running or not valid. "
+
     def kill_all_scripts(self):
         """ Forcefully close all scripts.
         Sends kill to all terminals, then checks for surviving. Removes terminals that died from self.running_scripts
@@ -95,4 +115,20 @@ class ScriptBot(commands.Bot):
         for script in killed_scripts:
             self.running_scripts.pop(script)
 
+    def _check_script_running(self, script_name):
+        """ Checks the given script is still running.
+        :param script_name: Script to check
+        :return bool: True if script exists and is running else false.
+        """
+        if script_name in self.running_scripts.keys():
+            return self.running_scripts[script_name].poll() is not None
+        return False
 
+    # TODO clean running scripts.
+
+
+def enqueue_output(out, queue):
+    """ Queues output from terminal. """
+    for line in iter(out.readline, b''):
+        queue.put(line)
+    out.close()
